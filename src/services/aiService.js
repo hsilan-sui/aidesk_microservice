@@ -3,7 +3,7 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY, // 來自 .env 的金鑰
 });
 
-async function getAIReply(messages) {
+async function getAIReply(chatlog) {
   const response = await openai.chat.completions.create({
     model: "gpt-3.5-turbo",
     messages: [
@@ -12,11 +12,15 @@ async function getAIReply(messages) {
         content:
           "你是一個親切的露營票務活動系統網站的客服機器人，請用繁體中文簡明扼要地回答使用者的問題。",
       },
-      {
-        role: "user",
-        messages, // 傳入多輪對話上下文
-        //content: message,
-      },
+      ...chatlog.map((msg) => ({
+        role: msg.role === "ai" ? "assistant" : msg.role, // 修正 role
+        content: msg.content,
+      })), // 傳入多輪對話上下文 直接展開使用者歷史對話陣列
+      //   {
+      //     role: "user",
+      //     content: messages, // 傳入多輪對話上下文
+      //     //content: message,
+      //   },
     ],
   });
 

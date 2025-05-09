@@ -116,7 +116,7 @@ io.on("connection", (socket) => {
       await redis.rpush(
         `chatlog:${userId}`,
         JSON.stringify({
-          role: "ai",
+          role: "assistant", // 這裡的 role 是 "ai" => assistant
           content: reply,
           timestamp: Date.now(),
         })
@@ -128,7 +128,7 @@ io.on("connection", (socket) => {
       //4.把ai的回覆發送給使用者
       socket.emit("ai:reply", reply);
     } catch (error) {
-      console.error("Redis 或 AI 回覆失敗", err);
+      console.error("Redis 或 AI 回覆失敗", error);
       socket.emit("aiReply", "系統忙線中，請稍候再試。");
     }
     // console.log(`收到來自 ${socket.id} 的訊息：${msg}`);
@@ -176,6 +176,24 @@ app.get("/chatlog", checkAuth, async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: "讀取聊天紀錄失敗", error: err.message });
+  }
+});
+
+app.delete("/chatlog", checkAuth, async (req, res) => {
+  const userId = req.user.id;
+  const key = `chatlog:${userId}`;
+
+  try {
+    const deletedCount = await redis.del(key);
+
+    if (deletedCount === 1) {
+      res.json({ message: "聊天紀錄已清空" });
+    } else {
+      res.status(404).json({ message: "找不到聊天紀錄" });
+    }
+  } catch (err) {
+    console.error("清除聊天紀錄失敗", err);
+    res.status(500).json({ message: "清除失敗", error: err.message });
   }
 });
 
