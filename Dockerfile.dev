@@ -21,7 +21,7 @@ RUN npm install -g nodemon
 COPY . .
 
 #這是預設啟動指令，當 container 執行時，就會跑這行（在容器內執行 nodemon bin/www.js）
-CMD ["nodemon","bin/www.js"]
+CMD ["nodemon","src/server.js"]
 
 
 #聲明這個 image 預期會用到 port 5000（給 docker-compose 或其他工具參考用途，不會自動開）
