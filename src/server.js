@@ -20,20 +20,44 @@ const io = new Server(server, {
 
 //加在 io.on 之前：Socket.IO 的中介層驗證
 io.use((socket, next) => {
-  const cookieHeader = socket.request.headers.cookie;
+  let token;
 
-  if (!cookieHeader) {
-    return next(new Error("請先登入會員"));
+  // 1. 優先從 cookie 抓（正式環境）
+  const cookieHeader = socket.request.headers.cookie;
+  if (cookieHeader) {
+    token = cookieHeader
+      .split("; ")
+      .find((cookie) => cookie.startsWith("access_token="))
+      ?.split("=")[1];
   }
 
-  const token = cookieHeader
-    .split("; ")
-    .find((cookie) => cookie.startsWith("access_token="))
-    ?.split("=")[1];
+  // 2. Postman 可傳 query token，例如：?token=xxx
+  if (!token && socket.handshake.query?.token) {
+    token = socket.handshake.query.token;
+  }
+
+  //3. 支援 Postman Socket.IO GUI 傳入的 auth.token
+  if (!token && socket.handshake.auth?.token) {
+    token = socket.handshake.auth.token;
+  }
 
   if (!token) {
-    return next(new Error("token不存在"));
+    return next(new Error("請先登入會員"));
   }
+  //   const cookieHeader = socket.request.headers.cookie;
+
+  //   if (!cookieHeader) {
+  //     return next(new Error("請先登入會員"));
+  //   }
+
+  //   const token = cookieHeader
+  //     .split("; ")
+  //     .find((cookie) => cookie.startsWith("access_token="))
+  //     ?.split("=")[1];
+
+  //   if (!token) {
+  //     return next(new Error("token不存在"));
+  //   }
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
