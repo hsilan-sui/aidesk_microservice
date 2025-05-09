@@ -94,12 +94,23 @@ io.on("connection", (socket) => {
         })
       );
 
-      //這代表只保留後面 10 筆資料（FIFO） ==> 測試
+      //這代表只保留後面 20 筆資料（FIFO） ==> 測試
       await redis.ltrim(`chatlog:${userId}`, -20, -1);
       await redis.expire(`chatlog:${userId}`, 60 * 60 * 24); // 設定過期時間為 24 小時
 
+      //1.5 => 取得最近上下文（最多 10 則）
+      const logs = await redis.lrange(`chatlog:${userId}`, -10, -1);
+      console.log(`${userId}logs在這裏`, logs);
+      const messages = logs.map((item) => {
+        const parsedMsg = JSON.parse(item);
+        return {
+          role: parsedMsg.role,
+          content: parsedMsg.content,
+        };
+      });
+
       //2.呼叫AI回覆
-      const reply = await getAIReply(msg);
+      const reply = await getAIReply(messages); // 根據1.5的新增=>修改 aiService 規格，支援 messages//==>呼叫 GPT，帶入上下文
 
       //3.儲存ai回覆
       await redis.rpush(
@@ -151,6 +162,21 @@ app.get("/check", checkAuth, (req, res) => {
     message: "微服務已登入",
     user: req.user,
   });
+});
+
+app.get("/chatlog", checkAuth, async (req, res) => {
+  const userId = req.user?.id;
+  try {
+    const rawChatlog = await redis.lrange(`chatlog:${userId}`, 0, -1);
+    const chatlog = rawChatlog.map((item) => JSON.parse(item));
+
+    res.json({
+      user: userId,
+      chatlog,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "讀取聊天紀錄失敗", error: err.message });
+  }
 });
 
 server.listen(process.env.PORT || 5005, () => {

@@ -3,7 +3,7 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY, // 來自 .env 的金鑰
 });
 
-async function getAIReply(message) {
+async function getAIReply(messages) {
   const response = await openai.chat.completions.create({
     model: "gpt-3.5-turbo",
     messages: [
@@ -14,7 +14,8 @@ async function getAIReply(message) {
       },
       {
         role: "user",
-        content: message,
+        messages, // 傳入多輪對話上下文
+        //content: message,
       },
     ],
   });
