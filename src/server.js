@@ -7,6 +7,7 @@ const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const { getAIReply } = require("./services/aiService");
 const { Server } = require("socket.io");
+const redis = require("./utils/redis");
 
 const app = express();
 const server = http.createServer(app);
@@ -71,19 +72,63 @@ io.use((socket, next) => {
 //🔐 雙向交握（Handshake）
 // 測試連線
 io.on("connection", (socket) => {
+  const userId = socket.user?.id;
+  if (!userId) {
+    socket.disconnect();
+    return;
+  }
+
   console.log(`${socket.id} 使用者已經連線！！！使用者資訊：`, socket.user);
   console.log("socket.request.headers", socket.request.headers);
 
   socket.on("client:message", async (msg) => {
-    console.log(`收到來自 ${socket.id} 的訊息：${msg}`);
-
+    //幫使用者 userId 建一個聊天抽屜（叫做 chatlog:userId），然後把這句話記下來，塞到最下面！
     try {
-      const aiText = await getAIReply(msg);
-      socket.emit("ai:reply", aiText);
+      //1.存使用者訊息(像聊天歷史的備份)
+      await redis.rpush(
+        `chatlog:${userId}`,
+        JSON.stringify({
+          role: "user",
+          content: msg,
+          timestamp: Date.now(),
+        })
+      );
+
+      //這代表只保留後面 10 筆資料（FIFO） ==> 測試
+      await redis.ltrim(`chatlog:${userId}`, -20, -1);
+      await redis.expire(`chatlog:${userId}`, 60 * 60 * 24); // 設定過期時間為 24 小時
+
+      //2.呼叫AI回覆
+      const reply = await getAIReply(msg);
+
+      //3.儲存ai回覆
+      await redis.rpush(
+        `chatlog:${userId}`,
+        JSON.stringify({
+          role: "ai",
+          content: reply,
+          timestamp: Date.now(),
+        })
+      );
+      //這代表只保留後面 10 筆資料（FIFO） ==> 測試
+      await redis.ltrim(`chatlog:${userId}`, -20, -1);
+      await redis.expire(`chatlog:${userId}`, 60 * 60 * 24); // 設定過期時間為 24 小時
+
+      //4.把ai的回覆發送給使用者
+      socket.emit("ai:reply", reply);
     } catch (error) {
-      console.error("AI 回覆錯誤：", error);
-      socket.emit("ai:reply", "抱歉，我無法處理您的請求。");
+      console.error("Redis 或 AI 回覆失敗", err);
+      socket.emit("aiReply", "系統忙線中，請稍候再試。");
     }
+    // console.log(`收到來自 ${socket.id} 的訊息：${msg}`);
+
+    // try {
+    //   const aiText = await getAIReply(msg);
+    //   socket.emit("ai:reply", aiText);
+    // } catch (error) {
+    //   console.error("AI 回覆錯誤：", error);
+    //   socket.emit("ai:reply", "抱歉，我無法處理您的請求。");
+    // }
     //假裝ai回覆
     // socket.emit(
     //   "ai:reply",
