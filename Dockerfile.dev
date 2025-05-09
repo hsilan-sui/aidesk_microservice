@@ -1,0 +1,28 @@
+
+# 使用 Node.js 20.11.1 的官方 image 當作基底，這是 image 的「起點
+FROM node:20.11.1
+
+# 把容器內的工作目錄設成 /app，之後的所有命令都在這個目錄執行
+WORKDIR /app
+
+# 把當前目錄的 package.json 和 package-lock.json 複製到容器內的 /app 目錄
+# 這樣做是為了讓 Docker 可以利用快取機制，避免每次都重新安裝 node_modules
+COPY package*.json ./
+RUN npm install
+
+# 安裝 nodemon，這是一個用來自動重啟 Node.js 應用程式的工具
+# 這樣在開發過程中就不需要手動重啟應用程式了
+# 這行命令會把 nodemon 安裝到全域，這樣就可以在任何地方使用它
+RUN npm install -g nodemon
+
+# 把當前目錄的所有檔案複製到容器內的 /app 目錄
+# 這樣做是為了讓容器內的應用程式可以使用當前目錄的檔案
+# 注意：這行命令會把所有檔案都複製到容器內，包括 node_modules
+COPY . .
+
+#這是預設啟動指令，當 container 執行時，就會跑這行（在容器內執行 nodemon bin/www.js）
+CMD ["nodemon","bin/www.js"]
+
+
+#聲明這個 image 預期會用到 port 5000（給 docker-compose 或其他工具參考用途，不會自動開）
+EXPOSE 5005

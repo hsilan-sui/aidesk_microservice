@@ -1,0 +1,30 @@
+version: "3.8"
+services:
+  backend:
+    build:
+      #build: . #表示要用你專案目錄的 預設Dockerfile 來 build 應用
+      #區分：開發 與 部署
+      #開發使用 ==> Dockerfile.dev 來建構
+      context: . #表示 build 的目錄是當前專案根目錄
+      dockerfile: Dockerfile.dev #我想要開發環境使用這個Dockerfile.dev文件
+    container_name: aidesk_backend
+    ports:
+      - "3005:5005"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    env_file:
+      - .env ## 將 .env 內容傳入容器內部環境變數
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:alpine
+    container_name: aidesk_redis
+    ports:
+      - "16379:6379" ## 外部用 16379 存取 Redis，避免佔用本機預設 6379
+    volumes:
+      - redis_data:/data # # Redis 資料儲存在 volume 裡
+
+volumes:
+  redis_data: # 宣告一個名為 redis_data 的 volume，給 Redis 儲存資料
